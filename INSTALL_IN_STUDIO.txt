@@ -1,0 +1,13 @@
+Do not use LuminaGrove.rbxmx. Studio rejects that file. Use a normal Baseplate instead.
+
+1. Roblox Studio, File, New, Baseplate.
+2. View menu, Command Bar.
+3. Paste the one line below and press Enter.
+4. If it errors about HTTP, open File, Experience Settings, Security, turn on Allow HTTP Requests, then paste the line again.
+5. In Explorer you should see ServerScriptService, LuminaGrove, Bootstrap and LuminaClient.
+6. File, Save to File As, name it LuminaGrove.rbxl. That file opens later. The rbxmx will not.
+7. Press Play. File, Publish to Roblox when you want it public.
+
+One line for the command bar:
+
+local h=game:GetService("HttpService"); h.HttpEnabled=true; local ss=game:GetService("ServerScriptService"); local f=ss:FindFirstChild("LuminaGrove") or Instance.new("Folder"); f.Name="LuminaGrove"; f.Parent=ss; local old=f:FindFirstChild("Bootstrap"); if old then old:Destroy() end; local old2=f:FindFirstChild("LuminaClient"); if old2 then old2:Destroy() end; local s=Instance.new("Script"); s.Name="Bootstrap"; s.Source=h:GetAsync("https://raw.githubusercontent.com/Seena-Tostitos/lumina-grove-studio/main/Bootstrap.server.lua"); s.Parent=f; local c=Instance.new("LocalScript"); c.Name="LuminaClient"; c.Source=h:GetAsync("https://raw.githubusercontent.com/Seena-Tostitos/lumina-grove-studio/main/LuminaClient.client.lua"); c.Parent=f; print("Installed. Save as rbxl, then press Play.")
