@@ -1,0 +1,1400 @@
+<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd" version="4">
+  <Item class="Folder" referent="RBX0">
+    <Properties>
+      <string name="Name">LuminaGrove</string>
+    </Properties>
+    <Item class="Script" referent="RBX1">
+      <Properties>
+        <string name="Name">Bootstrap</string>
+        <bool name="Disabled">false</bool>
+        <ProtectedString name="Source"><![CDATA[-- Lumina Grove
+-- Insert this model into Workspace, press Play, then File → Publish to Roblox.
+-- Publishing uses your Roblox account. There is no Grok login inside Studio.
+-- Saves work after you publish and turn on Game Settings → Security →
+-- Enable Studio Access to API Services.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local DataStoreService = game:GetService("DataStoreService")
+local ServerStorage = game:GetService("ServerStorage")
+
+if ServerStorage:FindFirstChild("LuminaGroveRunning") then
+	return
+end
+local running = Instance.new("BoolValue")
+running.Name = "LuminaGroveRunning"
+running.Parent = ServerStorage
+
+local Species = {
+	wickpear = { name = "Wickpear", rank = 0, price = 14, grow = 8, seed = 6, chapter = 1, plantable = true, color = Color3.fromRGB(230, 208, 184) },
+	mossbell = { name = "Mossbell", rank = 1, price = 28, grow = 11, seed = 16, chapter = 1, plantable = true, color = Color3.fromRGB(111, 148, 100) },
+	tideplum = { name = "Tideplum", rank = 2, price = 58, grow = 16, seed = 34, chapter = 2, plantable = true, color = Color3.fromRGB(126, 164, 184) },
+	cinderfig = { name = "Cinderfig", rank = 2, price = 72, grow = 18, seed = 42, chapter = 2, plantable = true, color = Color3.fromRGB(196, 120, 74) },
+	glassbloom = { name = "Glassbloom", rank = 3, price = 140, grow = 26, seed = 86, chapter = 3, plantable = true, color = Color3.fromRGB(213, 230, 234) },
+	nightcitrus = { name = "Nightcitrus", rank = 3, price = 180, grow = 30, seed = 110, chapter = 3, plantable = true, color = Color3.fromRGB(61, 86, 112) },
+	prismheart = { name = "Prismheart", rank = 4, price = 320, grow = 0, seed = 0, chapter = 3, plantable = false, color = Color3.fromRGB(197, 208, 200) },
+	beaconfruit = { name = "Beaconfruit", rank = 5, price = 520, grow = 34, seed = 0, chapter = 5, plantable = true, color = Color3.fromRGB(239, 230, 214) },
+}
+
+local SpeciesOrder = { "wickpear", "mossbell", "tideplum", "cinderfig", "glassbloom", "nightcitrus", "prismheart", "beaconfruit" }
+local Rotation = { "glassbloom", "nightcitrus" }
+local CoatList = {
+	{ id = "frosted", name = "Frosted", mul = 1.8, w = 40 },
+	{ id = "emberwash", name = "Emberwash", mul = 2.2, w = 28 },
+	{ id = "voidvein", name = "Voidvein", mul = 2.8, w = 18 },
+	{ id = "twincore", name = "Twincore", mul = 3.5, w = 9 },
+	{ id = "aurorarind", name = "Aurora rind", mul = 4.6, w = 5 },
+}
+local CoatMul = { none = 1 }
+for _, coat in ipairs(CoatList) do
+	CoatMul[coat.id] = coat.mul
+end
+local StarMul = { [1] = 1, [2] = 1.55, [3] = 2.35 }
+local PlotCosts = { 0, 0, 0, 0, 0, 0, 55, 95, 160, 260, 420, 680, 1100, 1700, 2600 }
+local SprinklerMul = { 1, 0.84, 0.7, 0.56 }
+local SprinklerCost = { 140, 520, 1800 }
+local ShearsChance = { 0, 0.18, 0.34 }
+local ShearsCost = { 100, 360 }
+local KindleCost = { 160, 280, 460, 720 }
+local SproutCost = { 150, 260, 420, 680 }
+local BrokerCost = { 300, 520, 880 }
+local GiverName = {
+	wren = "Wren Calder",
+	nim = "Nim Soot",
+	ivo = "Dr. Ivo Pell",
+	mara = "Mara Quill",
+	vale = "Captain Lumen Vale",
+}
+
+local Quests = {
+	{ giver = "wren", chapter = 1, title = "Read the thicket", detail = "Forage 3 wild cuttings.", kind = "stat", stat = "foraged", need = 3, reward = { embers = 20, seeds = { mossbell = 2 } } },
+	{ giver = "wren", chapter = 1, title = "Wake two beds", detail = "Plant 2 glims.", kind = "stat", stat = "planted", need = 2, reward = { embers = 18 } },
+	{ giver = "wren", chapter = 1, title = "The first glow", detail = "Harvest 4 glims.", kind = "stat", stat = "harvested", need = 4, reward = { embers = 30, shears = 1 } },
+	{ giver = "wren", chapter = 1, title = "Pay the cart", detail = "Earn 80 embers from sales.", kind = "stat", stat = "sold", need = 80, reward = { embers = 40, shards = 1 } },
+	{ giver = "nim", chapter = 2, title = "A second pair of hands", detail = "Hire 1 Kindlehand.", kind = "stat", stat = "kindle", need = 1, reward = { sprout = 1, embers = 30 } },
+	{ giver = "nim", chapter = 2, title = "Break new soil", detail = "Own 8 open beds.", kind = "stat", stat = "plots", need = 8, reward = { embers = 70 } },
+	{ giver = "nim", chapter = 2, title = "A working grove", detail = "Harvest 20 glims in all.", kind = "stat", stat = "harvested", need = 20, reward = { shards = 1, sprinkler = 1, seeds = { tideplum = 1, cinderfig = 1 } } },
+	{ giver = "ivo", chapter = 3, title = "Heat the still", detail = "Coat 1 glim in the still.", kind = "stat", stat = "mutations", need = 1, reward = { embers = 80 } },
+	{ giver = "ivo", chapter = 3, title = "Something rarer", detail = "Harvest a Tideplum or rarer glim.", kind = "stat", stat = "harvestedRare", need = 1, reward = { seeds = { glassbloom = 1 }, embers = 40 } },
+	{ giver = "ivo", chapter = 3, title = "Field notes", detail = "Discover 5 species.", kind = "stat", stat = "discovered", need = 5, reward = { shards = 1, embers = 60 } },
+	{ giver = "mara", chapter = 4, title = "Open the night market", detail = "Earn 1,600 embers from sales.", kind = "stat", stat = "sold", need = 1600, reward = { embers = 120, shards = 1 } },
+	{ giver = "mara", chapter = 4, title = "Ride the surge", detail = "Sell once during a night surge.", kind = "stat", stat = "surgeSold", need = 1, reward = { shards = 2 } },
+	{ giver = "mara", chapter = 4, title = "What the cart hides", detail = "Buy a Glassbloom or Nightcitrus cutting.", kind = "stat", stat = "boughtRare", need = 1, reward = { seeds = { nightcitrus = 1 }, embers = 80 } },
+	{ giver = "vale", chapter = 5, title = "East wick", detail = "Deliver 3 Wickpears.", kind = "deliver", species = "wickpear", coat = "any", need = 3, beacon = 1, reward = { shards = 1, embers = 40 } },
+	{ giver = "vale", chapter = 5, title = "Moss gate", detail = "Deliver 2 coated Mossbells.", kind = "deliver", species = "mossbell", coat = "coated", need = 2, beacon = 2, reward = { shards = 1, embers = 50 } },
+	{ giver = "vale", chapter = 5, title = "Tide stair", detail = "Deliver 2 Tideplums.", kind = "deliver", species = "tideplum", coat = "any", need = 2, beacon = 3, reward = { shards = 1, embers = 70 } },
+	{ giver = "vale", chapter = 5, title = "Glass arch", detail = "Deliver 1 coated Glassbloom.", kind = "deliver", species = "glassbloom", coat = "coated", need = 1, beacon = 4, reward = { shards = 2, embers = 90 } },
+	{ giver = "vale", chapter = 5, title = "Heart of the cove", detail = "Deliver 1 Prismheart.", kind = "deliver", species = "prismheart", coat = "any", need = 1, beacon = 5, reward = { shards = 2, seeds = { beaconfruit = 1 }, embers = 100 } },
+	{ giver = "vale", chapter = 5, title = "Plant the tin", detail = "Harvest a Beaconfruit.", kind = "stat", stat = "harvestedBeacon", need = 1, reward = { shards = 4, title = "Beacon heir", embers = 200 } },
+}
+
+local remotes = Instance.new("Folder")
+remotes.Name = "LuminaRemotes"
+remotes.Parent = ReplicatedStorage
+local stateEvent = Instance.new("RemoteEvent")
+stateEvent.Name = "State"
+stateEvent.Parent = remotes
+local openEvent = Instance.new("RemoteEvent")
+openEvent.Name = "Open"
+openEvent.Parent = remotes
+local actionEvent = Instance.new("RemoteEvent")
+actionEvent.Name = "Action"
+actionEvent.Parent = remotes
+
+local store
+pcall(function()
+	store = DataStoreService:GetDataStore("LuminaGroveV1")
+end)
+
+local surgeUntil = 0
+local nextSurge = os.clock() + 28
+local shopIndex = 1
+local shopRotateAt = os.clock() + 75
+local pinnedUntil = 0
+local heat = {}
+
+local sessions = {}
+local slots = {}
+
+local function newData()
+	local plots = {}
+	for i = 1, 15 do
+		plots[i] = "empty"
+	end
+	return {
+		embers = 42,
+		shards = 0,
+		seeds = { wickpear = 3 },
+		inv = {},
+		plots = plots,
+		unlocked = 6,
+		foraged = 0,
+		planted = 0,
+		harvested = 0,
+		sold = 0,
+		kindle = 0,
+		sprout = 0,
+		broker = 0,
+		sprinkler = 0,
+		shears = 0,
+		mutations = 0,
+		harvestedRare = 0,
+		surgeSold = 0,
+		boughtRare = 0,
+		harvestedBeacon = 0,
+		discovered = {},
+		questIndex = 1,
+		beacons = { false, false, false, false, false },
+		titleName = "Deed holder",
+		contractMark = 0,
+		nodeReady = { 0, 0, 0, 0 },
+		notice = "The deed is yours. Forage the thicket, then plant.",
+	}
+end
+
+local function copyData(saved)
+	local data = newData()
+	if type(saved) ~= "table" then
+		return data
+	end
+	for key, value in pairs(data) do
+		if saved[key] ~= nil then
+			if type(value) == "table" and type(saved[key]) == "table" then
+				local nextTable = {}
+				for innerKey, innerValue in pairs(saved[key]) do
+					nextTable[innerKey] = innerValue
+				end
+				data[key] = nextTable
+			else
+				data[key] = saved[key]
+			end
+		end
+	end
+	for i = 1, 15 do
+		if data.plots[i] == nil then
+			data.plots[i] = "empty"
+		end
+	end
+	return data
+end
+
+local function chapterOf(data)
+	local quest = Quests[data.questIndex]
+	return quest and quest.chapter or 6
+end
+
+local function statOf(data, stat)
+	if stat == "plots" then
+		return data.unlocked
+	end
+	if stat == "discovered" then
+		local n = 0
+		for _ in pairs(data.discovered) do
+			n += 1
+		end
+		return n
+	end
+	return data[stat] or 0
+end
+
+local function countFruit(data, species, coat)
+	local n = 0
+	for _, stack in pairs(data.inv) do
+		if stack.species == species then
+			if coat == "any" or (coat == "coated" and stack.mutation ~= "none") or stack.mutation == coat then
+				n += stack.count
+			end
+		end
+	end
+	return n
+end
+
+local function questProgress(data)
+	local quest = Quests[data.questIndex]
+	if not quest then
+		local need = data.contractMark + 12
+		return math.min(data.harvested, need), need, data.harvested >= need
+	end
+	if quest.kind == "stat" then
+		local current = statOf(data, quest.stat)
+		return math.min(current, quest.need), quest.need, current >= quest.need
+	end
+	local current = countFruit(data, quest.species, quest.coat)
+	return math.min(current, quest.need), quest.need, current >= quest.need
+end
+
+local function discover(data, species)
+	data.discovered[species] = true
+end
+
+local function addSeed(data, species, count)
+	data.seeds[species] = (data.seeds[species] or 0) + count
+	discover(data, species)
+end
+
+local function addInv(data, species, mutation, stars, count)
+	local key = species .. "|" .. mutation .. "|" .. tostring(stars)
+	local stack = data.inv[key]
+	if not stack then
+		stack = { species = species, mutation = mutation, stars = stars, count = 0 }
+		data.inv[key] = stack
+	end
+	stack.count += count
+	discover(data, species)
+end
+
+local function takeInv(data, species, mutation, stars, count)
+	local key = species .. "|" .. mutation .. "|" .. tostring(stars)
+	local stack = data.inv[key]
+	if not stack or stack.count < count then
+		return false
+	end
+	stack.count -= count
+	if stack.count <= 0 then
+		data.inv[key] = nil
+	end
+	return true
+end
+
+local function takeMatching(data, species, coat, count)
+	local need = count
+	local plan = {}
+	for key, stack in pairs(data.inv) do
+		if need <= 0 then
+			break
+		end
+		if stack.species == species and (coat == "any" or (coat == "coated" and stack.mutation ~= "none")) then
+			local use = math.min(stack.count, need)
+			table.insert(plan, { key = key, use = use })
+			need -= use
+		end
+	end
+	if need > 0 then
+		return false
+	end
+	for _, step in ipairs(plan) do
+		local stack = data.inv[step.key]
+		stack.count -= step.use
+		if stack.count <= 0 then
+			data.inv[step.key] = nil
+		end
+	end
+	return true
+end
+
+local function growMul(data)
+	return (SprinklerMul[data.sprinkler + 1] or 1) * (0.92 ^ data.sprout)
+end
+
+local function featured()
+	return Rotation[((shopIndex - 1) % #Rotation) + 1]
+end
+
+local function unitPrice(stack)
+	local spec = Species[stack.species]
+	local heatMul = 1 - (heat[stack.species] or 0) * 0.4
+	local surge = os.clock() < surgeUntil and 1.5 or 1
+	return math.max(1, math.floor(spec.price * StarMul[stack.stars] * (CoatMul[stack.mutation] or 1) * heatMul * surge + 0.5))
+end
+
+local function pushState(player)
+	local session = sessions[player]
+	if not session then
+		return
+	end
+	local data = session.data
+	local quest = Quests[data.questIndex]
+	local current, need, met = questProgress(data)
+	local title = quest and quest.title or "Steward contract"
+	local detail = quest and quest.detail or ("Harvest " .. tostring(need) .. " glims total")
+	local giver = quest and GiverName[quest.giver] or "Captain Lumen Vale"
+	stateEvent:FireClient(player, {
+		embers = data.embers,
+		shards = data.shards,
+		titleName = data.titleName,
+		giver = giver,
+		quest = title,
+		detail = detail,
+		current = current,
+		need = need,
+		met = met,
+		notice = data.notice,
+		surge = os.clock() < surgeUntil,
+	})
+	local stats = player:FindFirstChild("leaderstats")
+	if stats then
+		stats.Embers.Value = data.embers
+		stats.Shards.Value = data.shards
+	end
+end
+
+local function refreshGrove(session)
+	local data = session.data
+	local now = workspace:GetServerTimeNow()
+	for i = 1, 15 do
+		local crop = data.plots[i]
+		local fruit = session.fruits[i]
+		local label = session.labels[i]
+		local soil = session.plots[i]
+		if i > data.unlocked then
+			fruit.Transparency = 1
+			soil.Color = Color3.fromRGB(28, 26, 24)
+			if i == data.unlocked + 1 then
+				label.Text = tostring(PlotCosts[i]) .. " embers"
+			else
+				label.Text = "Later"
+			end
+		elseif type(crop) ~= "table" then
+			fruit.Transparency = 1
+			soil.Color = Color3.fromRGB(58, 50, 40)
+			label.Text = "Plant"
+		else
+			local spec = Species[crop.species]
+			local grow = tonumber(crop.grow) or 8
+			local plantedAt = tonumber(crop.plantedAt) or now
+			if not spec then
+				data.plots[i] = "empty"
+				fruit.Transparency = 1
+				label.Text = "Plant"
+			else
+				local elapsed = now - plantedAt
+				local alpha = math.clamp(elapsed / grow, 0, 1)
+				fruit.Transparency = 0
+				fruit.Color = spec.color
+				fruit.Size = Vector3.new(1.4, 1.4, 1.4) * (0.45 + alpha * 0.9)
+				fruit.CFrame = soil.CFrame * CFrame.new(0, 1.3 + alpha * 1.4, 0)
+				soil.Color = Color3.fromRGB(58, 50, 40)
+				if alpha >= 1 then
+					label.Text = "Ripe " .. spec.name
+				else
+					label.Text = spec.name .. " " .. tostring(math.ceil(grow - elapsed)) .. "s"
+				end
+			end
+		end
+	end
+	for index, lamp in ipairs(session.beacons) do
+		lamp.Material = data.beacons[index] and Enum.Material.Neon or Enum.Material.SmoothPlastic
+		lamp.Color = data.beacons[index] and Color3.fromRGB(156, 190, 164) or Color3.fromRGB(40, 48, 44)
+	end
+end
+
+local function makePart(parent, name, size, cf, color)
+	local part = Instance.new("Part")
+	part.Name = name
+	part.Anchored = true
+	part.Size = size
+	part.CFrame = cf
+	part.Color = color
+	part.TopSurface = Enum.SurfaceType.Smooth
+	part.BottomSurface = Enum.SurfaceType.Smooth
+	part.Parent = parent
+	return part
+end
+
+local function makeLabel(parent, text)
+	local gui = Instance.new("BillboardGui")
+	gui.Size = UDim2.fromOffset(140, 36)
+	gui.StudsOffset = Vector3.new(0, 3.2, 0)
+	gui.AlwaysOnTop = true
+	gui.Parent = parent
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 0.25
+	label.BackgroundColor3 = Color3.fromRGB(16, 20, 18)
+	label.TextColor3 = Color3.fromRGB(232, 239, 233)
+	label.Font = Enum.Font.GothamMedium
+	label.TextScaled = true
+	label.Size = UDim2.fromScale(1, 1)
+	label.Text = text
+	label.Parent = gui
+	return label
+end
+
+local function makePrompt(parent, action, object)
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = action
+	prompt.ObjectText = object
+	prompt.HoldDuration = 0
+	prompt.RequiresLineOfSight = false
+	prompt.MaxActivationDistance = 12
+	prompt.Parent = parent
+	return prompt
+end
+
+local function buildGrove(player, slot)
+	local origin = Vector3.new((slot - 1) * 190, 1, 0)
+	local model = Instance.new("Model")
+	model.Name = "Grove_" .. player.Name
+	model.Parent = workspace
+
+	makePart(model, "Ground", Vector3.new(150, 1, 120), CFrame.new(origin + Vector3.new(0, 0, 0)), Color3.fromRGB(26, 36, 30))
+
+	local session = {
+		data = newData(),
+		model = model,
+		slot = slot,
+		plots = {},
+		fruits = {},
+		labels = {},
+		beacons = {},
+		ready = false,
+	}
+
+	for i = 1, 15 do
+		local col = (i - 1) % 5
+		local row = math.floor((i - 1) / 5)
+		local pos = origin + Vector3.new((col - 2) * 10, 1, (row - 1) * 10 - 8)
+		local soil = makePart(model, "Bed" .. i, Vector3.new(7, 1, 7), CFrame.new(pos), Color3.fromRGB(58, 50, 40))
+		soil:SetAttribute("Plot", i)
+		local fruit = makePart(model, "Fruit" .. i, Vector3.new(1, 1, 1), CFrame.new(pos + Vector3.new(0, 2, 0)), Color3.fromRGB(230, 208, 184))
+		fruit.Shape = Enum.PartType.Ball
+		fruit.CanCollide = false
+		fruit.Transparency = 1
+		local label = makeLabel(soil, "Plant")
+		local click = Instance.new("ClickDetector")
+		click.MaxActivationDistance = 28
+		click.Parent = soil
+		local plotIndex = i
+		click.MouseClick:Connect(function(who)
+			if who ~= player or not session.ready then
+				return
+			end
+			onPlot(who, plotIndex)
+		end)
+		session.plots[i] = soil
+		session.fruits[i] = fruit
+		session.labels[i] = label
+	end
+
+	for b = 1, 5 do
+		local lamp = makePart(model, "Beacon" .. b, Vector3.new(1.2, 6, 1.2), CFrame.new(origin + Vector3.new((b - 3) * 8, 4, -32)), Color3.fromRGB(40, 48, 44))
+		session.beacons[b] = lamp
+	end
+
+	local board = makePart(model, "QuestBoard", Vector3.new(8, 6, 1), CFrame.new(origin + Vector3.new(0, 4, 28)), Color3.fromRGB(36, 48, 42))
+	makeLabel(board, "Turn in")
+	makePrompt(board, "Turn in", "Quest board").Triggered:Connect(function(who)
+		if who == player then
+			turnIn(who)
+		end
+	end)
+
+	local market = makePart(model, "Market", Vector3.new(8, 5, 6), CFrame.new(origin + Vector3.new(-48, 3.5, 8)), Color3.fromRGB(36, 42, 38))
+	makeLabel(market, "Night market")
+	makePrompt(market, "Sell all", "Mara Quill").Triggered:Connect(function(who)
+		if who == player then
+			sellAll(who)
+		end
+	end)
+
+	local shop = makePart(model, "Shop", Vector3.new(8, 5, 6), CFrame.new(origin + Vector3.new(-48, 3.5, -12)), Color3.fromRGB(42, 38, 32))
+	makeLabel(shop, "Shop")
+	makePrompt(shop, "Browse", "Ember stall").Triggered:Connect(function(who)
+		if who == player then
+			openShop(who)
+		end
+	end)
+
+	local still = makePart(model, "Still", Vector3.new(7, 5, 7), CFrame.new(origin + Vector3.new(48, 3.5, -8)), Color3.fromRGB(32, 40, 44))
+	makeLabel(still, "Prism still")
+	makePrompt(still, "Coat one", "Dr. Ivo Pell").Triggered:Connect(function(who)
+		if who == player then
+			coatOne(who)
+		end
+	end)
+	local kettle = makePart(model, "Kettle", Vector3.new(4, 3, 4), CFrame.new(origin + Vector3.new(48, 2.5, 2)), Color3.fromRGB(48, 42, 36))
+	makeLabel(kettle, "Stabilizer")
+	makePrompt(kettle, "Brew prism", "Prismheart").Triggered:Connect(function(who)
+		if who == player then
+			brewPrism(who)
+		end
+	end)
+
+	local names = { "East ditch", "Owl stump", "Glass run", "Old wick" }
+	for n = 1, 4 do
+		local pad = makePart(model, "Thicket" .. n, Vector3.new(6, 1, 6), CFrame.new(origin + Vector3.new(48, 1, (n - 2.5) * 10)), Color3.fromRGB(30, 48, 36))
+		makeLabel(pad, names[n])
+		makePrompt(pad, "Forage", names[n]).Triggered:Connect(function(who)
+			if who == player then
+				forage(who, n)
+			end
+		end)
+	end
+
+	local spawn = Instance.new("SpawnLocation")
+	spawn.Name = "GroveSpawn"
+	spawn.Size = Vector3.new(6, 1, 6)
+	spawn.Anchored = true
+	spawn.Neutral = false
+	spawn.Duration = 0
+	spawn.Color = Color3.fromRGB(26, 36, 30)
+	spawn.CFrame = CFrame.new(origin + Vector3.new(0, 1, 42))
+	spawn.Parent = model
+	session.spawn = spawn
+
+	sessions[player] = session
+	return session
+end
+
+local function giveReward(data, reward)
+	if not reward then
+		return
+	end
+	data.embers += reward.embers or 0
+	data.shards += reward.shards or 0
+	if reward.seeds then
+		for species, count in pairs(reward.seeds) do
+			addSeed(data, species, count)
+		end
+	end
+	if reward.sprinkler then
+		data.sprinkler = math.max(data.sprinkler, reward.sprinkler)
+	end
+	if reward.shears then
+		data.shears = math.max(data.shears, reward.shears)
+	end
+	if reward.sprout then
+		data.sprout = math.min(4, data.sprout + reward.sprout)
+	end
+	if reward.title then
+		data.titleName = reward.title
+	end
+end
+
+function turnIn(player)
+	local session = sessions[player]
+	if not session then
+		return
+	end
+	local data = session.data
+	local quest = Quests[data.questIndex]
+	local _, _, met = questProgress(data)
+	if not quest then
+		if not met then
+			data.notice = "The contract is not finished."
+		else
+			local need = data.contractMark + 12
+			data.embers += 90
+			if need % 24 == 0 then
+				data.shards += 1
+			end
+			data.contractMark = need
+			data.notice = "Contract paid. The lights stay lit."
+		end
+		pushState(player)
+		return
+	end
+	if not met then
+		data.notice = quest.detail
+		pushState(player)
+		return
+	end
+	if quest.kind == "deliver" then
+		if not takeMatching(data, quest.species, quest.coat, quest.need) then
+			data.notice = "Bring the glims in your stores, not only in the beds."
+			pushState(player)
+			return
+		end
+		data.beacons[quest.beacon] = true
+	end
+	giveReward(data, quest.reward)
+	data.questIndex += 1
+	data.notice = quest.title .. " is done."
+	refreshGrove(session)
+	pushState(player)
+end
+
+function sellAll(player)
+	local session = sessions[player]
+	if not session then
+		return
+	end
+	local data = session.data
+	local total = 0
+	local surged = os.clock() < surgeUntil
+	for _, stack in pairs(data.inv) do
+		local price = unitPrice(stack) * stack.count
+		total += price
+		heat[stack.species] = math.min(1, (heat[stack.species] or 0) + 0.07 * stack.count)
+	end
+	if total <= 0 then
+		data.notice = "Nothing to sell."
+		pushState(player)
+		return
+	end
+	data.inv = {}
+	data.embers += total
+	data.sold += total
+	if surged then
+		data.surgeSold += 1
+	end
+	data.notice = "Sold the stores for " .. tostring(total) .. " embers."
+	pushState(player)
+end
+
+local function shopRows(data)
+	local rows = {}
+	local chapter = chapterOf(data)
+	local rare = featured()
+	for _, id in ipairs(SpeciesOrder) do
+		local spec = Species[id]
+		if spec.plantable and spec.seed > 0 and id ~= "beaconfruit" then
+			local enabled = chapter >= spec.chapter and data.embers >= spec.seed
+			local detail = spec.seed .. " embers"
+			if chapter < spec.chapter then
+				enabled = false
+				detail = "Chapter " .. tostring(spec.chapter)
+			end
+			if (id == "glassbloom" or id == "nightcitrus") and id ~= rare then
+				enabled = false
+				detail = "Not on the slate"
+			end
+			table.insert(rows, { id = "seed:" .. id, label = spec.name .. " cutting", detail = detail, enabled = enabled })
+		end
+	end
+	local function hire(id, label, count, cap, costs)
+		local cost = costs[count + 1]
+		local enabled = cost ~= nil and data.embers >= cost
+		table.insert(rows, {
+			id = id,
+			label = label .. " " .. tostring(count) .. "/" .. tostring(cap),
+			detail = cost and (tostring(cost) .. " embers") or "Full",
+			enabled = enabled,
+		})
+	end
+	hire("hire:kindle", "Kindlehand", data.kindle, 4, KindleCost)
+	hire("hire:sprout", "Sprout tender", data.sprout, 4, SproutCost)
+	hire("hire:broker", "Night broker", data.broker, 3, BrokerCost)
+	local nextSpr = SprinklerCost[data.sprinkler + 1]
+	table.insert(rows, { id = "sprinkler", label = "Sprinkler tier " .. tostring(data.sprinkler), detail = nextSpr and (tostring(nextSpr) .. " embers") or "Max", enabled = nextSpr ~= nil and data.embers >= nextSpr })
+	local nextShears = ShearsCost[data.shears + 1]
+	table.insert(rows, { id = "shears", label = "Shears tier " .. tostring(data.shears), detail = nextShears and (tostring(nextShears) .. " embers") or "Max", enabled = nextShears ~= nil and data.embers >= nextShears })
+	table.insert(rows, { id = "hasten", label = "Hasten 30s", detail = "2 shards", enabled = data.shards >= 2 })
+	table.insert(rows, { id = "pin", label = "Pin rare slate", detail = "3 shards", enabled = data.shards >= 3 })
+	table.insert(rows, { id = "plot", label = "Plot token", detail = "8 shards", enabled = data.shards >= 8 and data.unlocked < 15 })
+	return rows
+end
+
+function openShop(player)
+	local session = sessions[player]
+	if not session then
+		return
+	end
+	openEvent:FireClient(player, { mode = "shop", title = "Ember stall", options = shopRows(session.data) })
+end
+
+local function openSeeds(player, plotIndex)
+	local data = sessions[player].data
+	local options = {}
+	for _, id in ipairs(SpeciesOrder) do
+		local count = data.seeds[id] or 0
+		if count > 0 and Species[id].plantable then
+			table.insert(options, { id = id, label = Species[id].name, detail = tostring(count) .. " held", enabled = true })
+		end
+	end
+	openEvent:FireClient(player, { mode = "seeds", title = "Bed " .. tostring(plotIndex), plot = plotIndex, options = options })
+end
+
+function onPlot(player, index)
+	local session = sessions[player]
+	local data = session.data
+	if index > data.unlocked then
+		if index ~= data.unlocked + 1 then
+			data.notice = "Open the beds in order."
+			pushState(player)
+			return
+		end
+		local cost = PlotCosts[index]
+		if data.embers < cost then
+			data.notice = "That bed costs " .. tostring(cost) .. " embers."
+			pushState(player)
+			return
+		end
+		data.embers -= cost
+		data.unlocked = index
+		data.notice = "Opened bed " .. tostring(index) .. "."
+		refreshGrove(session)
+		pushState(player)
+		return
+	end
+	local crop = data.plots[index]
+	if type(crop) == "table" then
+		if workspace:GetServerTimeNow() < crop.plantedAt + crop.grow then
+			data.notice = "Still growing."
+			pushState(player)
+			return
+		end
+		local stars = crop.stars
+		if data.shears > 0 and stars < 3 and math.random() < (ShearsChance[data.shears + 1] or 0) then
+			stars += 1
+		end
+		addInv(data, crop.species, crop.mutation, stars, 1)
+		data.harvested += 1
+		if Species[crop.species].rank >= 2 then
+			data.harvestedRare += 1
+		end
+		if crop.species == "beaconfruit" then
+			data.harvestedBeacon += 1
+		end
+		data.plots[index] = "empty"
+		data.notice = "Harvested a " .. Species[crop.species].name .. "."
+		refreshGrove(session)
+		pushState(player)
+		return
+	end
+	openSeeds(player, index)
+end
+
+local function plant(player, index, species)
+	local session = sessions[player]
+	if not session then
+		return
+	end
+	local data = session.data
+	local spec = Species[species]
+	if not spec or not spec.plantable then
+		return
+	end
+	if index < 1 or index > data.unlocked then
+		return
+	end
+	if type(data.plots[index]) == "table" then
+		return
+	end
+	if (data.seeds[species] or 0) < 1 then
+		data.notice = "No " .. spec.name .. " cuttings."
+		pushState(player)
+		return
+	end
+	data.seeds[species] -= 1
+	data.plots[index] = {
+		species = species,
+		mutation = "none",
+		stars = 2,
+		plantedAt = workspace:GetServerTimeNow(),
+		grow = math.max(3, math.floor(spec.grow * growMul(data) + 0.5)),
+	}
+	data.planted += 1
+	discover(data, species)
+	data.notice = "Planted a " .. spec.name .. "."
+	refreshGrove(session)
+	pushState(player)
+end
+
+function forage(player, node)
+	local session = sessions[player]
+	local data = session.data
+	local now = os.clock()
+	if (data.nodeReady[node] or 0) > now then
+		data.notice = "That patch needs a moment."
+		pushState(player)
+		return
+	end
+	data.nodeReady[node] = now + 9
+	local chapter = chapterOf(data)
+	local pool = { { "wickpear", 58 }, { "mossbell", 36 } }
+	if chapter >= 2 then
+		table.insert(pool, { "tideplum", 18 })
+		table.insert(pool, { "cinderfig", 14 })
+	end
+	if chapter >= 3 then
+		table.insert(pool, { "glassbloom", 7 })
+		table.insert(pool, { "nightcitrus", 4 })
+	end
+	local total = 0
+	for _, row in ipairs(pool) do
+		total += row[2]
+	end
+	local roll = math.random() * total
+	local species = "wickpear"
+	for _, row in ipairs(pool) do
+		roll -= row[2]
+		if roll <= 0 then
+			species = row[1]
+			break
+		end
+	end
+	local stars = math.random() < 0.22 and 3 or (math.random() < 0.5 and 2 or 1)
+	addSeed(data, species, 1)
+	data.foraged += 1
+	data.embers += 2 + stars
+	if stars == 3 and math.random() < 0.12 then
+		data.shards += 1
+		data.notice = "Clean cut. " .. Species[species].name .. " cutting and a starshard."
+	else
+		data.notice = "Cut a wild " .. Species[species].name .. "."
+	end
+	pushState(player)
+end
+
+function coatOne(player)
+	local session = sessions[player]
+	local data = session.data
+	local key, stack
+	for id, item in pairs(data.inv) do
+		if item.species ~= "prismheart" and item.species ~= "beaconfruit" then
+			key = id
+			stack = item
+			break
+		end
+	end
+	if not stack then
+		data.notice = "Harvest something the still can coat."
+		pushState(player)
+		return
+	end
+	local cost = 36 + Species[stack.species].rank * 28
+	if data.embers < cost then
+		data.notice = "Coating costs " .. tostring(cost) .. " embers."
+		pushState(player)
+		return
+	end
+	local total = 0
+	for _, coat in ipairs(CoatList) do
+		total += coat.w
+	end
+	local roll = math.random() * total
+	local chosen = CoatList[1]
+	for _, coat in ipairs(CoatList) do
+		roll -= coat.w
+		if roll <= 0 then
+			chosen = coat
+			break
+		end
+	end
+	if not takeInv(data, stack.species, stack.mutation, stack.stars, 1) then
+		return
+	end
+	data.embers -= cost
+	addInv(data, stack.species, chosen.id, stack.stars, 1)
+	data.mutations += 1
+	data.notice = Species[stack.species].name .. " took a " .. chosen.name .. " coat."
+	pushState(player)
+end
+
+function brewPrism(player)
+	local data = sessions[player].data
+	if chapterOf(data) < 3 then
+		data.notice = "Pell has not opened the stabilizer yet."
+		pushState(player)
+		return
+	end
+	if data.embers < 180 then
+		data.notice = "The prism recipe costs 180 embers."
+		pushState(player)
+		return
+	end
+	local glass, night
+	for _, stack in pairs(data.inv) do
+		if stack.species == "glassbloom" and not glass then
+			glass = stack
+		elseif stack.species == "nightcitrus" and not night then
+			night = stack
+		end
+	end
+	if not glass or not night then
+		data.notice = "Need a Glassbloom and a Nightcitrus in your stores."
+		pushState(player)
+		return
+	end
+	takeInv(data, glass.species, glass.mutation, glass.stars, 1)
+	takeInv(data, night.species, night.mutation, night.stars, 1)
+	data.embers -= 180
+	addInv(data, "prismheart", "none", 3, 1)
+	data.mutations += 1
+	data.notice = "The still stabilized a Prismheart."
+	pushState(player)
+end
+
+local function buy(player, itemId)
+	local session = sessions[player]
+	local data = session.data
+	local kind, arg = string.match(itemId, "^(%a+):?(.*)$")
+	if kind == "seed" then
+		local spec = Species[arg]
+		local rowsOk = false
+		for _, row in ipairs(shopRows(data)) do
+			if row.id == itemId and row.enabled then
+				rowsOk = true
+			end
+		end
+		if not rowsOk or not spec then
+			data.notice = "That cutting is not for sale."
+		else
+			data.embers -= spec.seed
+			addSeed(data, arg, 1)
+			if arg == "glassbloom" or arg == "nightcitrus" then
+				data.boughtRare += 1
+			end
+			data.notice = "Bought a " .. spec.name .. " cutting."
+		end
+	elseif kind == "hire" then
+		local count = data[arg]
+		local costs = arg == "kindle" and KindleCost or arg == "sprout" and SproutCost or BrokerCost
+		local cap = arg == "broker" and 3 or 4
+		local cost = costs[count + 1]
+		if not cost or count >= cap or data.embers < cost then
+			data.notice = "Cannot hire that."
+		else
+			data.embers -= cost
+			data[arg] = count + 1
+			data.notice = "Hired."
+		end
+	elseif itemId == "sprinkler" then
+		local cost = SprinklerCost[data.sprinkler + 1]
+		if not cost or data.embers < cost then
+			data.notice = "Sprinkler is maxed or too costly."
+		else
+			data.embers -= cost
+			data.sprinkler += 1
+			data.notice = "Sprinkler raised. New plantings finish faster."
+		end
+	elseif itemId == "shears" then
+		local cost = ShearsCost[data.shears + 1]
+		if not cost or data.embers < cost then
+			data.notice = "Shears are maxed or too costly."
+		else
+			data.embers -= cost
+			data.shears += 1
+			data.notice = "Shears raised. Hand harvests can gain a star."
+		end
+	elseif itemId == "hasten" then
+		if data.shards < 2 then
+			data.notice = "Hasten costs 2 starshards."
+		else
+			data.shards -= 2
+			local now = workspace:GetServerTimeNow()
+			for i = 1, 15 do
+				local crop = data.plots[i]
+				if type(crop) == "table" then
+					crop.plantedAt -= 30
+				end
+			end
+			data.notice = "Thirty seconds fell off every bed."
+		end
+	elseif itemId == "pin" then
+		if data.shards < 3 then
+			data.notice = "Pinning costs 3 starshards."
+		else
+			data.shards -= 3
+			pinnedUntil = os.clock() + 75
+			data.notice = "The rare slate is pinned."
+		end
+	elseif itemId == "plot" then
+		if data.shards < 8 or data.unlocked >= 15 then
+			data.notice = "No bed to open, or not enough shards."
+		else
+			data.shards -= 8
+			data.unlocked += 1
+			data.notice = "A plot token opened the next bed."
+		end
+	end
+	refreshGrove(session)
+	pushState(player)
+end
+
+local function harvestReady(session, manual)
+	local data = session.data
+	local now = workspace:GetServerTimeNow()
+	for i = 1, data.unlocked do
+		local crop = data.plots[i]
+		if type(crop) == "table" and now >= crop.plantedAt + crop.grow then
+			local stars = crop.stars
+			if manual and data.shears > 0 and stars < 3 and math.random() < (ShearsChance[data.shears + 1] or 0) then
+				stars += 1
+			end
+			addInv(data, crop.species, crop.mutation, stars, 1)
+			data.harvested += 1
+			if Species[crop.species].rank >= 2 then
+				data.harvestedRare += 1
+			end
+			if crop.species == "beaconfruit" then
+				data.harvestedBeacon += 1
+			end
+			data.plots[i] = "empty"
+			return true
+		end
+	end
+	return false
+end
+
+actionEvent.OnServerEvent:Connect(function(player, action, a, b)
+	if typeof(action) ~= "string" then
+		return
+	end
+	local session = sessions[player]
+	if not session or not session.ready then
+		return
+	end
+	if action == "seed" and typeof(a) == "number" and typeof(b) == "string" then
+		plant(player, a, b)
+	elseif action == "buy" and typeof(a) == "string" then
+		buy(player, a)
+	elseif action == "turnin" then
+		turnIn(player)
+	elseif action == "sell" then
+		sellAll(player)
+	elseif action == "shop" then
+		openShop(player)
+	end
+end)
+
+local function loadData(player)
+	if not store then
+		return newData()
+	end
+	local ok, saved = pcall(function()
+		return store:GetAsync("p" .. player.UserId)
+	end)
+	if ok then
+		return copyData(saved)
+	end
+	return newData()
+end
+
+local function saveData(player)
+	local session = sessions[player]
+	if not session or not store or not session.ready then
+		return
+	end
+	pcall(function()
+		store:SetAsync("p" .. player.UserId, session.data)
+	end)
+end
+
+local function setupPlayer(player)
+	if sessions[player] then
+		return
+	end
+	local slot
+	for i = 1, 8 do
+		if not slots[i] then
+			slots[i] = player
+			slot = i
+			break
+		end
+	end
+	if not slot then
+		player:Kick("This server's groves are full.")
+		return
+	end
+	local session = buildGrove(player, slot)
+	local stats = Instance.new("Folder")
+	stats.Name = "leaderstats"
+	stats.Parent = player
+	local embers = Instance.new("IntValue")
+	embers.Name = "Embers"
+	embers.Parent = stats
+	local shards = Instance.new("IntValue")
+	shards.Name = "Shards"
+	shards.Parent = stats
+
+	local ps = player:WaitForChild("PlayerScripts")
+	if not ps:FindFirstChild("LuminaClient") then
+		local client = script.Parent:WaitForChild("LuminaClient"):Clone()
+		client.Parent = ps
+	end
+
+	session.data = loadData(player)
+	session.data.nodeReady = { 0, 0, 0, 0 }
+	if not store then
+		session.data.notice = "Saves turn on after you publish and enable Studio API access. This visit still plays."
+	end
+	session.ready = true
+	refreshGrove(session)
+	pushState(player)
+	task.delay(1, function()
+		if sessions[player] then
+			pushState(player)
+		end
+	end)
+	player.RespawnLocation = session.spawn
+	local function placeCharacter(character)
+		local root = character:WaitForChild("HumanoidRootPart", 10)
+		if root and sessions[player] then
+			root.CFrame = session.spawn.CFrame * CFrame.new(0, 4, 0)
+		end
+	end
+	if player.Character then
+		task.spawn(placeCharacter, player.Character)
+	end
+	player.CharacterAdded:Connect(placeCharacter)
+end
+
+Players.PlayerAdded:Connect(setupPlayer)
+for _, player in ipairs(Players:GetPlayers()) do
+	task.spawn(setupPlayer, player)
+end
+
+Players.PlayerRemoving:Connect(function(player)
+	saveData(player)
+	local session = sessions[player]
+	if session then
+		slots[session.slot] = nil
+		session.model:Destroy()
+		sessions[player] = nil
+	end
+end)
+
+task.spawn(function()
+	while true do
+		task.wait(0.5)
+		local nowClock = os.clock()
+		if nowClock >= nextSurge then
+			surgeUntil = nowClock + 20
+			nextSurge = nowClock + 72
+			for player, session in pairs(sessions) do
+				session.data.notice = "Night surge. The cove is overpaying."
+				pushState(player)
+			end
+		end
+		if nowClock >= shopRotateAt then
+			if nowClock >= pinnedUntil then
+				shopIndex += 1
+			end
+			shopRotateAt = nowClock + 75
+		end
+		for species, value in pairs(heat) do
+			heat[species] = value * math.exp(-0.5 / 48)
+		end
+		for player, session in pairs(sessions) do
+			if session.ready and session.data.kindle > 0 then
+				session.kindleAcc = (session.kindleAcc or 0) + 0.5 * session.data.kindle
+				if session.kindleAcc >= 3.6 then
+					if harvestReady(session, false) then
+						session.kindleAcc -= 3.6
+					else
+						session.kindleAcc = 3.6
+					end
+				end
+			end
+			refreshGrove(session)
+		end
+	end
+end)
+
+game:BindToClose(function()
+	for player in pairs(sessions) do
+		saveData(player)
+	end
+end)
+]]></ProtectedString>
+      </Properties>
+    </Item>
+    <Item class="LocalScript" referent="RBX2">
+      <Properties>
+        <string name="Name">LuminaClient</string>
+        <bool name="Disabled">false</bool>
+        <ProtectedString name="Source"><![CDATA[local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+local remotes = ReplicatedStorage:WaitForChild("LuminaRemotes")
+local stateEvent = remotes:WaitForChild("State")
+local openEvent = remotes:WaitForChild("Open")
+local actionEvent = remotes:WaitForChild("Action")
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "LuminaHud"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local function corner(parent, radius)
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0, radius)
+	c.Parent = parent
+end
+
+local top = Instance.new("Frame")
+top.Name = "Top"
+top.BackgroundColor3 = Color3.fromRGB(26, 33, 28)
+top.BorderSizePixel = 0
+top.Position = UDim2.fromOffset(16, 16)
+top.Size = UDim2.new(1, -32, 0, 92)
+top.Parent = gui
+corner(top, 16)
+
+local title = Instance.new("TextLabel")
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.GothamBold
+title.TextSize = 22
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.TextColor3 = Color3.fromRGB(232, 239, 233)
+title.Position = UDim2.fromOffset(16, 10)
+title.Size = UDim2.new(0.55, 0, 0, 28)
+title.Text = "Lumina Grove"
+title.Parent = top
+
+local purse = Instance.new("TextLabel")
+purse.BackgroundTransparency = 1
+purse.Font = Enum.Font.GothamMedium
+purse.TextSize = 16
+purse.TextXAlignment = Enum.TextXAlignment.Right
+purse.TextColor3 = Color3.fromRGB(215, 227, 216)
+purse.Position = UDim2.new(0.45, 0, 0, 12)
+purse.Size = UDim2.new(0.55, -16, 0, 24)
+purse.Text = "0 embers"
+purse.Parent = top
+
+local quest = Instance.new("TextButton")
+quest.Name = "Quest"
+quest.BackgroundColor3 = Color3.fromRGB(16, 20, 18)
+quest.AutoButtonColor = true
+quest.Font = Enum.Font.GothamMedium
+quest.TextSize = 16
+quest.TextXAlignment = Enum.TextXAlignment.Left
+quest.TextColor3 = Color3.fromRGB(232, 239, 233)
+quest.Position = UDim2.fromOffset(16, 46)
+quest.Size = UDim2.new(1, -32, 0, 34)
+quest.Text = "  Loading the deed"
+quest.Parent = top
+corner(quest, 8)
+quest.MouseButton1Click:Connect(function()
+	actionEvent:FireServer("turnin")
+end)
+
+local notice = Instance.new("TextLabel")
+notice.BackgroundColor3 = Color3.fromRGB(215, 227, 216)
+notice.TextColor3 = Color3.fromRGB(18, 24, 22)
+notice.Font = Enum.Font.GothamMedium
+notice.TextSize = 16
+notice.BackgroundTransparency = 1
+notice.TextTransparency = 1
+notice.AnchorPoint = Vector2.new(0.5, 1)
+notice.Position = UDim2.new(0.5, 0, 1, -24)
+notice.Size = UDim2.new(0.8, 0, 0, 36)
+notice.Text = ""
+notice.Parent = gui
+corner(notice, 8)
+
+local panel = Instance.new("Frame")
+panel.Name = "Panel"
+panel.Visible = false
+panel.AnchorPoint = Vector2.new(0.5, 0.5)
+panel.Position = UDim2.fromScale(0.5, 0.55)
+panel.Size = UDim2.fromOffset(420, 460)
+panel.BackgroundColor3 = Color3.fromRGB(26, 33, 28)
+panel.BorderSizePixel = 0
+panel.Parent = gui
+corner(panel, 18)
+
+local panelTitle = Instance.new("TextLabel")
+panelTitle.BackgroundTransparency = 1
+panelTitle.Font = Enum.Font.GothamBold
+panelTitle.TextSize = 20
+panelTitle.TextXAlignment = Enum.TextXAlignment.Left
+panelTitle.TextColor3 = Color3.fromRGB(232, 239, 233)
+panelTitle.Position = UDim2.fromOffset(16, 12)
+panelTitle.Size = UDim2.new(1, -120, 0, 28)
+panelTitle.Text = "Shop"
+panelTitle.Parent = panel
+
+local close = Instance.new("TextButton")
+close.Text = "Close"
+close.Font = Enum.Font.GothamMedium
+close.TextSize = 16
+close.BackgroundColor3 = Color3.fromRGB(36, 48, 42)
+close.TextColor3 = Color3.fromRGB(232, 239, 233)
+close.Size = UDim2.fromOffset(80, 32)
+close.Position = UDim2.new(1, -96, 0, 12)
+close.Parent = panel
+corner(close, 8)
+close.MouseButton1Click:Connect(function()
+	panel.Visible = false
+end)
+
+local list = Instance.new("ScrollingFrame")
+list.BackgroundTransparency = 1
+list.Position = UDim2.fromOffset(12, 56)
+list.Size = UDim2.new(1, -24, 1, -68)
+list.CanvasSize = UDim2.fromOffset(0, 0)
+list.ScrollBarThickness = 6
+list.Parent = panel
+
+local layout = Instance.new("UIListLayout")
+layout.Padding = UDim.new(0, 8)
+layout.Parent = list
+layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+	list.CanvasSize = UDim2.fromOffset(0, layout.AbsoluteContentSize.Y + 8)
+end)
+
+local openPayload
+
+local function drawOptions(payload)
+	openPayload = payload
+	panelTitle.Text = payload.title or "Lumina"
+	for _, child in ipairs(list:GetChildren()) do
+		if child:IsA("TextButton") then
+			child:Destroy()
+		end
+	end
+	for _, option in ipairs(payload.options or {}) do
+		local button = Instance.new("TextButton")
+		button.Size = UDim2.new(1, -8, 0, 52)
+		button.BackgroundColor3 = Color3.fromRGB(16, 20, 18)
+		button.TextColor3 = Color3.fromRGB(232, 239, 233)
+		button.Font = Enum.Font.GothamMedium
+		button.TextSize = 16
+		button.TextXAlignment = Enum.TextXAlignment.Left
+		button.Text = "  " .. option.label .. "    " .. (option.detail or "")
+		button.AutoButtonColor = option.enabled ~= false
+		button.Active = option.enabled ~= false
+		if option.enabled == false then
+			button.TextColor3 = Color3.fromRGB(122, 138, 128)
+		end
+		button.Parent = list
+		corner(button, 8)
+		button.MouseButton1Click:Connect(function()
+			if option.enabled == false then
+				return
+			end
+			if payload.mode == "seeds" then
+				actionEvent:FireServer("seed", payload.plot, option.id)
+			else
+				actionEvent:FireServer("buy", option.id)
+			end
+			panel.Visible = false
+		end)
+	end
+	if #(payload.options or {}) == 0 then
+		local empty = Instance.new("TextButton")
+		empty.Size = UDim2.new(1, -8, 0, 52)
+		empty.BackgroundTransparency = 1
+		empty.Text = "Nothing here yet. Forage the thicket."
+		empty.TextColor3 = Color3.fromRGB(154, 171, 160)
+		empty.Font = Enum.Font.GothamMedium
+		empty.TextSize = 16
+		empty.Parent = list
+	end
+	panel.Visible = true
+end
+
+local lastNotice = ""
+stateEvent.OnClientEvent:Connect(function(payload)
+	if type(payload) ~= "table" then
+		return
+	end
+	title.Text = "Lumina Grove  ·  " .. (payload.titleName or "Deed holder")
+	local surge = payload.surge and "   SURGE" or ""
+	purse.Text = tostring(payload.embers or 0) .. " embers    " .. tostring(payload.shards or 0) .. " shards" .. surge
+	local ready = payload.met and "Turn in  ·  " or ""
+	quest.Text = "  " .. ready .. (payload.giver or "") .. "  ·  " .. (payload.quest or "") .. "  " .. tostring(payload.current or 0) .. "/" .. tostring(payload.need or 0)
+	if payload.notice and payload.notice ~= lastNotice then
+		lastNotice = payload.notice
+		notice.Text = payload.notice
+		notice.BackgroundTransparency = 0
+		notice.TextTransparency = 0
+		task.delay(2.6, function()
+			if notice.Text == payload.notice then
+				notice.BackgroundTransparency = 1
+				notice.TextTransparency = 1
+			end
+		end)
+	end
+end)
+
+openEvent.OnClientEvent:Connect(drawOptions)
+]]></ProtectedString>
+      </Properties>
+    </Item>
+  </Item>
+</roblox>

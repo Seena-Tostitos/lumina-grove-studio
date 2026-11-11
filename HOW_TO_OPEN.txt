@@ -1,0 +1,16 @@
+Lumina Grove for Roblox Studio
+
+A Grok account cannot connect to Roblox Studio. Publish with your Roblox account.
+
+1. Install Roblox Studio and sign in.
+2. Create a new Baseplate.
+3. In Explorer, right-click Workspace.
+4. Choose Insert from File and select LuminaGrove.rbxmx.
+5. Press Play to test.
+6. File > Publish to Roblox > create a new experience.
+7. For saves between visits: Game Settings > Security > Enable Studio Access to API Services.
+
+If Studio will not insert the model, create a Folder named LuminaGrove and add:
+- a Script named Bootstrap, paste Bootstrap.server.lua
+- a LocalScript named LuminaClient, paste LuminaClient.client.lua
+Put the folder in ServerScriptService, then press Play.
